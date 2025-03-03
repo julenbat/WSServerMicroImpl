@@ -61,7 +61,7 @@ const upgradeSocket = (request) => {
 * @returns {void}
 */
 const unmask_buffer = (mask, buffer, msglen) => {
-	const offset = (msglen < 126) ? 6: msglen: (msglen == 126) 8:12
+	const offset = (msglen < 126) ? 6: (msglen == 126) ? 8:12
 
 	for(let i = 0; i < msglen; i++){
 		buffer[offset + i] = (buffer[offset + i] ^  mask[i % 4])
