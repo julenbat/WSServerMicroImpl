@@ -29,7 +29,7 @@ const FLAGS = {
 	PAYLOAD_BIG: 0x7F
 }
 
-const pongResponse = () => 0x8
+const pongResponse =  () => null;
 
 /**
 *	@returns {boolean}
@@ -61,7 +61,7 @@ const upgradeSocket = (request) => {
 * @returns {void}
 */
 const unmask_buffer = (mask, buffer, msglen) => {
-	const offset = (msglen < 126) ? 6: msglen: (msglen == 126) 8:12
+	const offset = (msglen < 126) ? 6:(msglen == 126) ? 8:12
 
 	for(let i = 0; i < msglen; i++){
 		buffer[offset + i] = (buffer[offset + i] ^  mask[i % 4])
@@ -79,15 +79,15 @@ const unmask_buffer = (mask, buffer, msglen) => {
 * @param  {http.Server | https.Server} server
 * @param  {Object} opts
 */
-export function WSServer(server=null, opts={port: 80, keyPath: '', cert: '', ...othersOpts}){
+export function WSServer(server=null, opts={port:80, keyPath:'', cert:'', ...othersOpts}){
 	const ServerEmitter = new EventEmitter();
 
 
 	if(!server) {
-		if(!keyPath || !certPath) server = http.createServer(opts);
+		if((!('keyPath' in opts) || !opts.keyPath) || (!('cert' in opts) || !opts.cert)) server = http.createServer(opts);
 		server = https.createServer(opts)
 
-		server.listen(port);
+		server.listen(opts.port);
 	}
 
 	const clients = new Map();
@@ -103,9 +103,9 @@ export function WSServer(server=null, opts={port: 80, keyPath: '', cert: '', ...
 
 
 	return {
-		getClients: () => Clients;
-		onConnection: (fn) => ServerEmitter.on('connection', fn);
-		removeOnConnection: fn => ServerEmitter.removeListener('connection', fn);
+		getClients: () => clients,
+		onConnection: (fn) => ServerEmitter.on('connection', fn),
+		removeOnConnection: fn => ServerEmitter.removeListener('connection', fn)
 	}
 }
 
@@ -132,7 +132,7 @@ function WSClient(socket){
 
 
 	return {
-		onMessage: () => {}
+		onMessage: () => {},
 		onClose: () => {}
 
 	}
