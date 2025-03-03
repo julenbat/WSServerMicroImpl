@@ -19,7 +19,7 @@ const FLAGS = {
 	IS_FIN: (ui16) => (ui16 &(0x1 << 15)),
 	IS_CLOSE: (ui16) => (ui16 &(0x4 << 8)),
 	IS_MASKED: (ui16) => (ui16 &(0x1 << 7)),
-	IS_CONTINUATION: (ui16) => ((ui16  (0xF << 8)) == 0)
+	IS_CONTINUATION: (ui16) => ((ui16 ^ (0xF << 8)) == 0),
 	IS_TEXT: (ui16) => ((ui16 & (0x1 << 8)) == (0x1 << 8)),
 	IS_BINARY: (ui16) => ((ui16 & (0x2 << 8)) == (0x2 << 8)),
  	IS_PING: (ui16) => ((ui16 & (0x9 << 8)) == (0x9 << 8)),
