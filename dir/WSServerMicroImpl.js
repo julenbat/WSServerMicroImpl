@@ -5,7 +5,7 @@ import EventEmitter from 'node:events'
 
 
 /*
-* @description FLAG Values are takes as first 16 bits are read as Uint16BE
+* @description FLAG Values are takes as first 16 bits are read as Uint16LE
 * We assume data is encoded in UTF-8, since that. we do not care about the byte order of Mask and payload.
 * https://datatracker.ietf.org/doc/html/rfc6455#section-5
 */
@@ -97,7 +97,7 @@ const unmask_buffer = (mask, buffer, msglen) => {
 const mask_data = (mask, buffer) => {
 	const len = buffer.byteLength;
 
-	for(let i = 0; i < len; i++) 
+	for(let i = 0; i < len; i++)
 		buffer[i] = (buffer[i] ^ mask[i % 4]);
 
 }
@@ -130,9 +130,7 @@ export function WSServer(server=null, opts={port:80, keyPath:'', cert:'', ...oth
 	server.on('upgrade', (req, socket, head) => {
 		if(!upgradeSocket(req)) return;
 
-		clients.set(socket, new WSClient(socket));
-
-		ServerEmitter.emit('connection', socket, req);
+		ServerEmitter.emit('connection', new WSClient(socket), req);
 	})
 
 
