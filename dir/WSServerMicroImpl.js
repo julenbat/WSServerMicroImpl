@@ -37,7 +37,7 @@ const pongResponse =  (flags, buffer) => {
 			const _mask = buffer.subarray(2,6)
 			data = buffer.subarray(6, 6 + len);
 
-			mask(_mask, data);
+			mask_data(_mask, data);
 		}else data = buffer.subarray(2, 2 + len)
 
 		base_response = buffer.concat(base_response,  data) 
@@ -94,7 +94,7 @@ const unmask_buffer = (mask, buffer, msglen) => {
 
 }
 
-const mask = (mask, buffer) => {
+const mask_data = (mask, buffer) => {
 	const len = buffer.byteLength;
 
 	for(let i = 0; i < len; i++) 
@@ -120,7 +120,7 @@ export function WSServer(server=null, opts={port:80, keyPath:'', cert:'', ...oth
 
 	if(!server) {
 		if((!('keyPath' in opts) || !opts.keyPath) || (!('cert' in opts) || !opts.cert)) server = http.createServer(opts);
-		server = https.createServer(opts)
+		else server = https.createServer(opts)
 
 		server.listen(opts.port);
 	}
@@ -163,17 +163,19 @@ function WSClient(socket){
 	const readData = (buffer) => {
 		if(!Buffer.isBuffer(x) )  return console.error('unsupported read data type, is not Buffer');
 
-		const flags = buffer.readUint16LE(0)
+		const flags = buffer.readUint16LE(0);
 		if(FLAGS.IS_CLOSE(flags)) return (ClientEmitter.emit('close', socket));
 		if(FLAGS.IS_PING(flags)) return socket.write(getPongData(flags, buffer));
 
 		const payload_size = BigInt(getPayloadLength(flags, buffer));
-		const payload_offset = (payload_size < 126) ? 6: (payload_size === 126) ? 8:10
+		const payload_offset = (payload_size < 126) ? 6: (payload_size === 126) ? 8:10;
+		const mask = buffer.subarray(payload_offset -4, payload_offset);
+		const cur_data = mask_data(mask, buffer.subarray(payload_offset, payload_offet + payload_size));
 
-		if(FLAGS.IS_CONTINUATION(flags))  prevData = (prevData) ? Buffer.concat(prevData, buffer.subarray(payload_offset, payload_offset + payload_size)) : buffer.subarray(payload_offset, payload_offset + payload_size); 
+		if(FLAGS.IS_CONTINUATION(flags))  prevData = (prevData) ? Buffer.concat(prevData, cur_data) : cur_data; 
 		if(FLAGS.IS_FIN(flags)){
 
-			ClientEmitter.emit('message', prevData || buffer.subarray(payload_offset, payload_offset + payload_size), getPayloadType(flags))
+			ClientEmitter.emit('message', prevData || cur_data, getPayloadType(flags))
 			prevData = null;
 		}
 
@@ -194,7 +196,6 @@ function WSClient(socket){
 		onClose: (fn) => ClientEmitter.on('close', fn),
 		closeClient: () =>  endConnection(),
 		getSocket: () => socket
-
 	}
 
 
