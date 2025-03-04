@@ -4,12 +4,6 @@ import crypto from 'node:crypto'
 import EventEmitter from 'node:events'
 
 
-
-
-
-
-
-
 /*
 * @description FLAG Values are takes as first 16 bits are read as Uint16BE
 * We assume data is encoded in UTF-8, since that. we do not care about the byte order of Mask and payload.
@@ -17,7 +11,7 @@ import EventEmitter from 'node:events'
 */
 const FLAGS = {
 	IS_FIN: (ui16) => (ui16 & 0x8000),
-	IS_CLOSE: (ui16) => (ui16 & 0x4000),
+	IS_CLOSE: (ui16) => (ui16 & 0x0800),
 	IS_MASKED: (ui16) => (ui16 & 0x0080),
 	IS_CONTINUATION: (ui16) => ((ui16 ^ 0x0F00) == 0),
 	IS_TEXT: (ui16) => ((ui16 & (0x0100)) == 0x0100),
@@ -29,7 +23,38 @@ const FLAGS = {
 	PAYLOAD_BIG: 0x7F
 }
 
-const pongResponse =  () => null;
+/*
+* @description Maximun PING payload is 125 bytes according to WebSocket RFC 5.5.3
+* @returns {Buffer}
+*/
+const pongResponse =  (flags, buffer) => {
+	let base_response = Buffer.from([0x8, 0xA]);
+	const len = FLAGS.PAYLOAD_SIZE(flags)
+
+	if((len > 0)){
+		let data;
+		if(FLAGS.IS_MAKED(flags)){
+			const _mask = buffer.subarray(2,6)
+			data = buffer.subarray(6, 6 + len);
+
+			mask(_mask, data);
+		}else data = buffer.subarray(2, 2 + len)
+
+		base_response = buffer.concat(base_response,  data) 
+	}
+
+	return base_response;
+}
+
+const getPayloadLenght = (flags, buffer) => {
+	const i_size = FLAGS.PAYLOAD_SIZE(flags);
+	const payload_padding = (FLAGS.IS_MASKED(flags)) ? 4:0;
+
+	if(i_size <= 125) return i_size;
+	else if(i_size === 126) return buffer.readUint16LE(2 + payload_padding);
+
+	return buffer.readUint32LE(2 + payload_padding)
+}
 
 /**
 *	@returns {boolean}
@@ -68,6 +93,16 @@ const unmask_buffer = (mask, buffer, msglen) => {
 	}
 
 }
+
+const mask = (mask, buffer) => {
+	const len = buffer.byteLength;
+
+	for(let i = 0; i < len; i++) 
+		buffer[i] = (buffer[i] ^ mask[i % 4]);
+
+}
+
+
 
 /**
 * @typedef {Object} WSSocket
@@ -121,19 +156,44 @@ function WSClient(socket){
 
 	})
 
-
+	/**
+	* @description
+	* @pre RFC states Client payload has to always be masked
+	*/
 	const readData = (buffer) => {
 		if(!Buffer.isBuffer(x) )  return console.error('unsupported read data type, is not Buffer');
 
-		const headers = buffer.readUint16BE(0)
-		if(flags.IS_CLOSE(headers)) return (ClientEmitter.emit('close', socket))
+		const flags = buffer.readUint16LE(0)
+		if(FLAGS.IS_CLOSE(flags)) return (ClientEmitter.emit('close', socket));
+		if(FLAGS.IS_PING(flags)) return socket.write(getPongData(flags, buffer));
+
+		const payload_size = BigInt(getPayloadLength(flags, buffer));
+		const payload_offset = (payload_size < 126) ? 6: (payload_size === 126) ? 8:10
+
+		if(FLAGS.IS_CONTINUATION(flags))  prevData = (prevData) ? Buffer.concat(prevData, buffer.subarray(payload_offset, payload_offset + payload_size)) : buffer.subarray(payload_offset, payload_offset + payload_size); 
+		if(FLAGS.IS_FIN(flags)){
+
+			ClientEmitter.emit('message', prevData || buffer.subarray(payload_offset, payload_offset + payload_size), getPayloadType(flags))
+			prevData = null;
+		}
+
+		return;
 	}
+	const endConnection = () => {
+		socket.write(buffer.from([0x88, 0x00]))
+		socket.destroy()
+	}
+
+
+	const getPayloadType = (flags) => (FLAGS.IS_TEXT(flags)) ? 'text' : 'binary'
 
 
 
 	return {
-		onMessage: () => {},
-		onClose: () => {}
+		onMessage: (fn) => ClientEmitter.on('message', fn),
+		onClose: (fn) => ClientEmitter.on('close', fn),
+		closeClient: () =>  endConnection(),
+		getSocket: () => socket
 
 	}
 
