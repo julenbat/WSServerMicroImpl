@@ -46,12 +46,13 @@ const pongResponse =  (flags, buffer) => {
 	return base_response;
 }
 
-const getPayloadLenght = (flags, buffer) => {
+const getPayloadLength = (flags, buffer) => {
 	const i_size = FLAGS.PAYLOAD_SIZE(flags);
 	const payload_padding = (FLAGS.IS_MASKED(flags)) ? 4:0;
 
 	if(i_size <= 125) return i_size;
 	else if(i_size === 126) return buffer.readUint16LE(2 + payload_padding);
+	else return new BigInt(buffer.readUint64LE(8 + payload_padding))
 
 	return buffer.readUint32LE(2 + payload_padding)
 }
@@ -86,7 +87,7 @@ const upgradeSocket = (request) => {
 * @returns {void}
 */
 const unmask_buffer = (mask, buffer, msglen) => {
-	const offset = (msglen < 126) ? 6:(msglen == 126) ? 8:12
+	const offset = (msglen < 126) ? 6:(msglen == 126) ? 8:14
 
 	for(let i = 0; i < msglen; i++){
 		buffer[offset + i] = (buffer[offset + i] ^  mask[i % 4])
@@ -165,8 +166,8 @@ function WSClient(socket){
 		if(FLAGS.IS_CLOSE(flags)) return (ClientEmitter.emit('close', socket));
 		if(FLAGS.IS_PING(flags)) return socket.write(getPongData(flags, buffer));
 
-		const payload_size = BigInt(getPayloadLength(flags, buffer));
-		const payload_offset = (payload_size < 126) ? 6: (payload_size === 126) ? 8:10;
+		const payload_size = getPayloadLength(flags, buffer);
+		const payload_offset = (payload_size < 126) ? 6: (payload_size === 126) ? 8:12;
 		const mask = buffer.subarray(payload_offset -4, payload_offset);
 		const cur_data = mask_data(mask, buffer.subarray(payload_offset, payload_offet + payload_size));
 
