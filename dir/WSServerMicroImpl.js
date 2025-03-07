@@ -167,7 +167,7 @@ function WSClient(socket){
 		if(FLAGS.IS_PING(flags)) return socket.write(getPongData(flags, buffer));
 
 		const payload_size = getPayloadLength(flags, buffer);
-		const payload_offset = (payload_size < 126) ? 6: (payload_size === 126) ? 8:12;
+		const payload_offset = (payload_size < 126) ? 6: (payload_size === 126) ? 8:14;
 		const mask = buffer.subarray(payload_offset -4, payload_offset);
 		const cur_data = mask_data(mask, buffer.subarray(payload_offset, payload_offet + payload_size));
 
